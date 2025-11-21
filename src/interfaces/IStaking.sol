@@ -70,6 +70,7 @@ interface IStaking is IStakingInitiationRead, IStakingReturnsWrite {
     /// @param amount 分配给流动性缓冲池的 ETH 数量。
     event AllocatedETHToLiquidityBuffer(uint256 amount);
 
+    //error
     error DoesNotReceiveETH();
     error InvalidConfiguration();
     error MaximumValidatorDepositExceeded();

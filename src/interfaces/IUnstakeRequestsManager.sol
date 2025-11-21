@@ -16,7 +16,7 @@ struct UnstakeRequest {
     uint128 id;
     uint128 mETHLocked;
     uint128 ethRequested;
-    uint128 cumulativeEthRequested;
+    uint128 cumulativeETHRequested;
 }
 
 interface IUnstakeRequestsManagerWrite {
@@ -55,7 +55,7 @@ interface IUnstakeRequestsManagerRead {
     /// @return 指示请求是否已完成的布尔值，以及已填充的 ETH 数量。
     function requestInfo(uint256 requestID) external view returns (bool, uint256);
 
-    /// @notice 计算合约中分配的超过支付未索赔所需总额的以太币数量。
+    /// @notice 计算合约中分配的超过支付未claim所需总额的以太币数量。
     /// @return 多余的 allocatedETH 数量。
     function allocatedETHSurplus() external view returns (uint256);
 
@@ -68,4 +68,62 @@ interface IUnstakeRequestsManagerRead {
     function balance() external view returns (uint256);
 }
 
-interface IUnstakeRequestsManager is IUnstakeRequestsManagerRead, IUnstakeRequestsManagerWrite {}
+interface IUnstakeRequestsManager is IUnstakeRequestsManagerRead, IUnstakeRequestsManagerWrite {
+    /// @notice Created emitted when an unstake request has been created.
+    /// @param id The id of the unstake request.
+    /// @param requester The address of the user who requested to unstake.
+    /// @param mETHLocked The amount of mETH that will be burned when the request is claimed.
+    /// @param ethRequested The amount of ETH that will be returned to the requester.
+    /// @param cumulativeETHRequested The cumulative amount of ETH requested at the time of the unstake request.
+    /// @param blockNumber The block number at the point at which the request was created.
+    event UnstakeRequestCreated(
+        uint256 indexed id,
+        address indexed requester,
+        uint256 mETHLocked,
+        uint256 ethRequested,
+        uint256 cumulativeETHRequested,
+        uint256 blockNumber
+    );
+
+    /// @notice Claimed emitted when an unstake request has been claimed.
+    /// @param id The id of the unstake request.
+    /// @param requester The address of the user who requested to unstake.
+    /// @param mETHLocked The amount of mETH that will be burned when the request is claimed.
+    /// @param ethRequested The amount of ETH that will be returned to the requester.
+    /// @param cumulativeETHRequested The cumulative amount of ETH requested at the time of the unstake request.
+    /// @param blockNumber The block number at the point at which the request was created.
+    event UnstakeRequestClaimed(
+        uint256 indexed id,
+        address indexed requester,
+        uint256 mETHLocked,
+        uint256 ethRequested,
+        uint256 cumulativeETHRequested,
+        uint256 blockNumber
+    );
+
+    /// @notice Cancelled emitted when an unstake request has been cancelled by an admin.
+    /// @param id The id of the unstake request.
+    /// @param requester The address of the user who requested to unstake.
+    /// @param mETHLocked The amount of mETH that will be burned when the request is claimed.
+    /// @param ethRequested The amount of ETH that will be returned to the requester.
+    /// @param cumulativeETHRequested The cumulative amount of ETH requested at the time of the unstake request.
+    /// @param blockNumber The block number at the point at which the request was created.
+    event UnstakeRequestCancelled(
+        uint256 indexed id,
+        address indexed requester,
+        uint256 mETHLocked,
+        uint256 ethRequested,
+        uint256 cumulativeETHRequested,
+        uint256 blockNumber
+    );
+
+    // ============================================
+    // errors
+    // ============================================
+    error AlreadyClaimed();
+    error DoesNotReceiveETH();
+    error NotEnoughFunds(uint256 cumulativeETHOnRequest, uint256 allocatedETHForClaims);
+    error NotFinalized();
+    error NotRequester();
+    error NotStakingContract();
+}

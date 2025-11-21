@@ -62,4 +62,45 @@ interface IOracleManager {
     function setOracleUpdater(address newUpdater) external;
 }
 
-interface IOracle is IOracleWrite, IOracleRead, IOracleManager {}
+interface IOracle is IOracleWrite, IOracleRead, IOracleManager {
+    /// @notice Emitted when a new oracle record was added to the list of oracle records. A pending record will only
+    /// emit this event if it was accepted by the admin.
+    /// @param index The index of the new record.
+    /// @param record The new record that was added to the list.
+    event OracleRecordAdded(uint256 indexed index, OracleRecord record);
+
+    /// @notice Emitted when a record has been modified.
+    /// @param index The index of the record that was modified.
+    /// @param record The newly modified record.
+    event OracleRecordModified(uint256 indexed index, OracleRecord record);
+
+    /// @notice Emitted when a pending update has been rejected.
+    /// @param pendingUpdate The rejected pending update.
+    event OraclePendingUpdateRejected(OracleRecord pendingUpdate);
+
+    /// @notice Emitted when the oracle's record did not pass a sanity check.
+    /// @param reasonHash The hash of the reason for the record rejection.
+    /// @param reason The reason for the record rejection.
+    /// @param record The record that was rejected.
+    /// @param value The value that violated a bound.
+    /// @param bound The bound of the rejected update.
+    event OracleRecordFailedSanityCheck(
+        bytes32 indexed reasonHash, string reason, OracleRecord record, uint256 value, uint256 bound
+    );
+
+    // Errors.
+    error CannotUpdateWhileUpdatePending();
+    error CannotModifyInitialRecord();
+    error InvalidConfiguration();
+    error InvalidRecordModification();
+    error InvalidUpdateStartBlock(uint256 wantUpdateStartBlock, uint256 gotUpdateStartBlock);
+    error InvalidUpdateEndBeforeStartBlock(uint256 end, uint256 start);
+    error InvalidUpdateMoreDepositsProcessedThanSent(uint256 processed, uint256 sent);
+    error InvalidUpdateMoreValidatorsThanInitiated(uint256 numValidatorsOnRecord, uint256 numInitiatedValidators);
+    error NoUpdatePending();
+    error Paused();
+    error RecordDoesNotExist(uint256 idx);
+    error UnauthorizedOracleUpdater(address sender, address oracleUpdater);
+    error UpdateEndBlockNumberNotFinal(uint256 updateFinalizingBlock);
+    error ZeroAddress();
+}
