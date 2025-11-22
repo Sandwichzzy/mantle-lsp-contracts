@@ -156,7 +156,7 @@ contract Oracle is Initializable, AccessControlEnumerableUpgradeable, IOracle, I
         // 每天 7200 个槽位 * 每年 365 天 = 每年 2628000 个槽位
         // 假设每年 5% 收益
         // 5% / 2628000 = 1.9025e-8
-        // 1.9025e-8 每槽位 = 19025 PPT
+        // 1.9025e-8 每槽位 = 19025 PPT（1e-12）
         maxConsensusLayerGainPerBlockPPT = 190250; // 约10倍估计速率
         minConsensusLayerGainPerBlockPPT = 1903; // 约0.1倍估计速率
 
