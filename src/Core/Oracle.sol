@@ -197,6 +197,7 @@ contract Oracle is Initializable, AccessControlEnumerableUpgradeable, IOracle, I
 
         validateUpdate(_records.length - 1, newRecord);
 
+        //Finalize区块检查，每次提交收益记录，检测对应取款是否是Finalized,防止收益被回滚
         uint256 updateFinalizingBlock = newRecord.updateEndBlock + finalizationBlockNumberDelta;
         if (block.number < updateFinalizingBlock) {
             revert UpdateEndBlockNumberNotFinal(updateFinalizingBlock);
@@ -345,7 +346,7 @@ contract Oracle is Initializable, AccessControlEnumerableUpgradeable, IOracle, I
                     prevRecord.currentNumValidatorsNotWithdrawable + prevRecord.cumulativeNumValidatorsWithdrawable;
                 uint256 newNumValidators =
                     newRecord.currentNumValidatorsNotWithdrawable + newRecord.cumulativeNumValidatorsWithdrawable;
-
+                //验证者总数不应减少
                 if (newNumValidators < prevNumValidators) {
                     return ("Total number of validators decreased", newNumValidators, prevNumValidators);
                 }
@@ -355,7 +356,6 @@ contract Oracle is Initializable, AccessControlEnumerableUpgradeable, IOracle, I
         {
             // 存款检查：
             // 检查预言机处理的存款总额在新预言机期间没有减少。
-            // 还检查新存入的 ETH 数量是否与我们在新期间包含的验证者数量一致
             if (newRecord.cumulativeProcessedDepositAmount < prevRecord.cumulativeProcessedDepositAmount) {
                 return (
                     "Processed deposit amount decreased",
@@ -364,6 +364,7 @@ contract Oracle is Initializable, AccessControlEnumerableUpgradeable, IOracle, I
                 );
             }
 
+            // 还检查新存入的 ETH 数量即新增存款金额与新增验证者数量匹配
             uint256 newDeposits =
                 (newRecord.cumulativeProcessedDepositAmount - prevRecord.cumulativeProcessedDepositAmount);
             uint256 newValidators = (newRecord.currentNumValidatorsNotWithdrawable
@@ -394,21 +395,33 @@ contract Oracle is Initializable, AccessControlEnumerableUpgradeable, IOracle, I
             // 检查共识层余额的变化是否在最大损失和最小收益参数给定的范围内。
             // 例如，重大罚没事件会导致共识层出现超出边界的损失
 
+            //               实际例子
+
+            //   假设配置值（来自 initialize 函数）：
+            //   - maxConsensusLayerLossPPM = 1000（0.1% 损失上限）
+            //   - minConsensusLayerGainPerBlockPPT = 1903（年化 0.5% 收益下限）
+            //   - maxConsensusLayerGainPerBlockPPT = 190250（年化 50% 收益上限）
+
+            //   如果基准余额为 1000 ETH，报告周期为 1000 个区块：
+            //   - 下限 ≈ 1000 - 1 + 0.0019 ≈ 999 ETH
+            //   - 上限 ≈ 1000 + 0.19 ≈ 1000.19 ETH
+
+            //   实际余额必须在 [999, 1000.19] ETH 范围内才能通过检查。
+
             // baselineGrossCLBalance 表示在新期间内，假设没有罚没、没有奖励等情况下，
             // 验证者余额的预期增长。它用作上限（增长）和下限（损失）计算的基准
+            // validator理论余额=上一次的验证者总余额 + 新存款
             uint256 baselineGrossCLBalance = prevRecord.currentTotalValidatorBalance
                 + (newRecord.cumulativeProcessedDepositAmount - prevRecord.cumulativeProcessedDepositAmount);
 
             // newGrossCLBalance 是我们在新记录期间在共识层中记录的 ETH 实际数量
+            // 实际余额=仍在验证者中的余额+已提取的本金+已提取的奖励
             uint256 newGrossCLBalance = newRecord.currentTotalValidatorBalance
                 + newRecord.windowWithdrawnPrincipalAmount + newRecord.windowWithdrawnRewardAmount;
 
             {
-                // 共识层上 ETH 净减少的相对下限
-                // 根据参数，损失项可能完全主导 minGain 项
-                //
-                // 使用大于 0 的 minConsensusLayerGainPerBlockPPT，下限成为向上的斜率
-                // 设置 minConsensusLayerGainPerBlockPPT，下限成为常量
+                // 共识层上 ETH 净减少的相对下限 下限检查（lowerBound）
+                // 公式：基准余额 - 最大允许损失 + 最小预期收益
                 uint256 lowerBound = baselineGrossCLBalance
                     - Math.mulDiv(maxConsensusLayerLossPPM, baselineGrossCLBalance, _PPM_DENOMINATOR)
                     + Math.mulDiv(
@@ -420,7 +433,8 @@ contract Oracle is Initializable, AccessControlEnumerableUpgradeable, IOracle, I
                 }
             }
             {
-                // 验证者产生的奖励上限，随时间和活跃验证者数量线性缩放
+                //  上限检查（upperBound）
+                // 公式：基准余额 + 最大预期收益
                 uint256 upperBound = baselineGrossCLBalance
                     + Math.mulDiv(
                         maxConsensusLayerGainPerBlockPPT * reportSize, baselineGrossCLBalance, _PPT_DENOMINATOR
